@@ -1,4 +1,4 @@
-## Project 1
+## Project 1 K Nearest Neighbors
 
 1. Download the project folder
 
