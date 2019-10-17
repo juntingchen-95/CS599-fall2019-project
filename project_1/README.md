@@ -16,8 +16,10 @@ Hastie, et al. Elements of Statistical Learning, Figure 13.4
 
 ### Steps to reproduce
 
+Necessary software: Python 3, R, RStudio
+
 1. Download the project folder
 
-2. In the command line, change the root in the project folder, type "python project_1.py". Then, it will generate the file "result.csv"
+2. In the command line, change the root in the project folder, type "python main.py". Then, it will generate the file "result.csv"
 
-3. In RStudio, open the file "generate_figure.R", run the code, then it will generate the figure file "result_figure.pdf". Before running the code, you need to make sure that ggplot2 package is installed
+3. In RStudio, open the file "generate_figure.R", select all and run the code, then it will generate the figure file "result_figure.pdf". Before running the code, you need to make sure that ggplot2 package is installed
