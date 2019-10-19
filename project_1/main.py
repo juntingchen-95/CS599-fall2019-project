@@ -1,5 +1,6 @@
 import csv
 import math
+import sys
 
 
 # The class of KNN
@@ -7,12 +8,14 @@ class KNN:
     result = []
 
     # main method of the class, read the data, set the K-value, calculate and write the result in a CSV file
-    def __init__(self, k_value):
+    def __init__(self, test_file_path, k_value):
         self.training_data = self.read_data('dataset/training_set.csv')
-        self.test_data = self.read_data('dataset/test_set.csv')
+        self.test_data = self.read_data(test_file_path)
         self.k_value = k_value
         self.calculate()
-        self.write_data('result.csv')
+        file_path_list = test_file_path.split('/')
+        file_name = file_path_list[len(file_path_list) - 1].split('.')[0]
+        self.write_data(file_name + '_result.csv')
 
     # The method to read the CSV file
     @staticmethod
@@ -66,4 +69,7 @@ class KNN:
 
 
 if __name__ == '__main__':
-    KNN = KNN(7)
+    if len(sys.argv) == 0:
+        print('Undefined test file path')
+    else:
+        KNN = KNN(sys.argv[1], 7)
