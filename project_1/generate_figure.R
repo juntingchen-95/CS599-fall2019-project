@@ -31,7 +31,7 @@ test.error <- sum(marginal$marginal * (bayes_prob$prob * I(pred < 0) + (1 - baye
 bayes.error <- sum(marginal$marginal * (bayes_prob$prob * I(bayes_prob$prob < 0.5) + 
                                           (1 - bayes_prob$prob) * I(bayes_prob$prob >= 0.5)))
 
-ggplot() + 
+plot <- ggplot() + 
   # Set colors of points
   scale_color_manual(values = c("#5EB6E9", "#E99F00")) +
   # Plot the background grid points
@@ -48,10 +48,10 @@ ggplot() +
   theme(panel.background = element_rect(color = "black", fill = "white"), panel.grid = element_blank(),
         axis.title = element_blank(), axis.text = element_blank(), axis.ticks = element_blank(), legend.position = "none") +
   # Annotate error values on the figure
-  annotate("rect", xmin = -2.61, xmax = -0.95, ymin = -2.02, ymax = -1.3, fill = "white", color = "white") +
-  annotate("text", label = paste("Training Error:\nTest Error:\nBayes Error:"), x = -2.6, y = -1.7, size = 4.5, hjust = 0) +
+  annotate("rect", xmin = -2.61, xmax = -0.95, ymin = -2.02, ymax = -1.45, fill = "white", color = "white") +
+  annotate("text", label = paste("Training Error:\nTest Error:\nBayes Error:"), x = -2.6, y = -1.8, size = 5, hjust = 0) +
   annotate("text", label = paste(round(training.error, 3), round(test.error, 3), round(bayes.error, 3), sep='\n'), 
-           x = -1.45, y = -1.7, size = 4.5, hjust = 0)
+           x = -1.45, y = -1.8, size = 5, hjust = 0)
 
 # Save the plot as PDF format
-ggsave(filename = paste(dir, "result_figure.pdf", sep='/'), width = 10, height = 9)
+ggsave(filename = paste(dir, "result_figure.pdf", sep='/'), plot = plot, width = 10, height = 9)
