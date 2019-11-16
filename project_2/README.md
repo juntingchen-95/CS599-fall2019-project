@@ -2,7 +2,7 @@
 
 ### Purpose
 
-Implement the K-Nearest Neighbor algorithm and redo the example from the text book
+Implement the Maximum Margin Interval Trees algorithm with both squared and linear hinge loss solvers and redo the example from the paper.
 
 ### Project Description PDF
 
