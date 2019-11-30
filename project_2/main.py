@@ -1,217 +1,250 @@
-from copy import copy
-import numpy as np
-from numpy import ndarray
+import numpy
+import pandas
+import os
+import csv
+import math
 
 
-class Node:
-    # Build tree leaves.
+class Project2:
 
-    attr_names = ("avg", "left", "right", "feature", "split", "mse")
-
-    def __init__(self, avg=None, left=None, right=None, feature=None, split=None, mse=None):
-        self.avg = avg
-        self.left = left
-        self.right = right
-        self.feature = feature
-        self.split = split
-        self.mse = mse
-
-    def __str__(self):
-        ret = []
-        for attr_name in self.attr_names:
-            attr = getattr(self, attr_name)
-            # Describe the attribute of Node.
-            if attr is None:
-                continue
-            if isinstance(attr, Node):
-                des = "%s: Node object." % attr_name
-            else:
-                des = "%s: %s" % (attr_name, attr)
-            ret.append(des)
-
-        return "\n".join(ret) + "\n"
-
-    def copy(self, node):
-        # Copy the attributes of another Node.
-
-        for attr_name in self.attr_names:
-            attr = getattr(node, attr_name)
-            setattr(self, attr_name, attr)
-
-
-class RegressionTree:
-
+    # Initialize variables
     def __init__(self):
-        self.root = Node()
-        self.depth = 1
-        self._rules = None
+        self.y_lower = []
+        self.y_upper = []
+        self.data_length = 0
+        self.moves_list = []
+        self.breakpoint_list = []
+        self.min_pointer = 0
+        self.min_coefficients = (0, 0, 0)
+        self.loss_type = 1
 
-    def __str__(self):
-        ret = []
-        for i, rule in enumerate(self._rules):
-            literals, avg = rule
+    # The main loop
+    def run(self):
+        dataset_path = 'datasets'
+        # Write result CSV header
+        self.save_result(['number', 'loss_type', 'max', 'average', 'q1', 'q3'])
+        # Read each dataset
+        for folder in os.listdir(dataset_path):
+            print('Process data ' + folder)
+            y_data, data_length = self.read_data(dataset_path + '/' + folder + '/targets.csv')
+            self.y_lower = y_data['min.log.penalty']
+            self.y_upper = y_data['max.log.penalty']
+            self.data_length = data_length
 
-            ret.append("Rule %d: " % i + ' | '.join(
-                literals) + ' => y_hat %.4f' % avg)
-        return "\n".join(ret)
+            for i in range(1, 3):
+                self.moves_list = [0 for col in range(self.data_length)]
+                self.breakpoint_list = []
+                self.min_pointer = 0
+                self.min_coefficients = (0, 0, 0)
 
-    @staticmethod
-    def _expr2literal(expr: list) -> str:
-
-        feature, operation, split = expr
-        operation = ">=" if operation == 1 else "<"
-        return "Feature%d %s %.4f" % (feature, operation, split)
-
-    def get_rules(self):
-        # Get the rules of all the tree nodes.
-
-        # Breadth-First Search.
-        que = [[self.root, []]]
-        self._rules = []
-
-        while que:
-            node, exprs = que.pop(0)
-
-            # Generate a rule when the current node is leaf node.
-            if not(node.left or node.right):
-                # Convert expression to text.
-                literals = list(map(self._expr2literal, exprs))
-                self._rules.append([literals, node.avg])
-
-            # Expand when the current node has left child.
-            if node.left:
-                rule_left = copy(exprs)
-                rule_left.append([node.feature, -1, node.split])
-                que.append([node.left, rule_left])
-
-            # Expand when the current node has right child.
-            if node.right:
-                rule_right = copy(exprs)
-                rule_right.append([node.feature, 1, node.split])
-                que.append([node.right, rule_right])
+                # Calculate moves in linear/square loss
+                self.loss_type = i
+                self.calculate_moves()
+                self.save_result()
 
     @staticmethod
-    def _get_split_mse(col: ndarray, label: ndarray, split: float) -> Node:
-        # Calculate the mse of label when col is splitted into two pieces.
+    # Dataset reader method
+    def read_data(file_path):
+        targets_data = pandas.read_csv(file_path)
+        targets_data.values.astype(numpy.float)
+        return targets_data.to_dict(), targets_data.shape[0]
 
-        # Split label.
-        label_left = label[col < split]
-        label_right = label[col >= split]
+    # Count and save moves
+    def save_result(self, data=None):
+        if data is None:
+            stat = {
+                'max': 0,
+                'sum': 0,
+                'number': len(self.moves_list)
+            }
+            loss_list = {
+                1: 'Linear',
+                2: 'Square'
+            }
+            for element in self.moves_list:
+                if element > stat['max']:
+                    stat['max'] = element
+                stat['sum'] += element
+            data = [
+                stat['number'],
+                loss_list[self.loss_type],
+                stat['max'],
+                stat['sum'] / stat['number'],
+                self.calcualte_quantile(self.moves_list, 0.25),
+                self.calcualte_quantile(self.moves_list, 0.75)
+            ]
+        with open('result.csv', 'a', newline='') as file:
+            result_csv = csv.writer(file)
+            result_csv.writerow(data)
 
-        # Calculate the means of label.
-        avg_left = label_left.mean()
-        avg_right = label_right.mean()
-
-        # Calculate the mse of label.
-        mse = (((label_left - avg_left) ** 2).sum() +
-               ((label_right - avg_right) ** 2).sum()) / len(label)
-
-        # Create nodes to store result.
-        node = Node(split=split, mse=mse)
-        node.left = Node(avg_left)
-        node.right = Node(avg_right)
-
-        return node
-
-    def _choose_split(self, col: ndarray, label: ndarray) -> Node:
-
-        # Feature cannot be splitted if there's only one unique element.
-        node = Node()
-        unique = set(col)
-        if len(unique) == 1:
-            return node
-
-        # In case of empty split.
-        unique.remove(min(unique))
-
-        # Get split point which has min mse.
-        ite = map(lambda x: self._get_split_mse(col, label, x), unique)
-        node = min(ite, key=lambda x: x.mse)
-
-        return node
-
-    def _choose_feature(self, data: ndarray, label: ndarray) -> Node:
-
-        # Compare the mse of each feature and choose best one.
-        _ite = map(lambda x: (self._choose_split(data[:, x], label), x),
-                   range(data.shape[1]))
-        ite = filter(lambda x: x[0].split is not None, _ite)
-
-        # Return None if no feature can be splitted.
-        node, feature = min(
-            ite, key=lambda x: x[0].mse, default=(Node(), None))
-        node.feature = feature
-
-        return node
-
-    def fit(self, data: ndarray, label: ndarray, max_depth=5, min_samples_split=2):
-
-        # Initialize with depth, node, indexes.
-        self.root.avg = label.mean()
-        que = [(self.depth + 1, self.root, data, label)]
-
-        # Breadth-First Search.
-        while que:
-            depth, node, _data, _label = que.pop(0)
-
-            # Terminate loop if tree depth is more than max_depth.
-            if depth > max_depth:
-                depth -= 1
-                break
-
-            # Stop split when number of node samples is less than
-            # min_samples_split or Node is 100% pure.
-            if len(_label) < min_samples_split or all(_label == label[0]):
-                continue
-
-            # Stop split if no feature has more than 2 unique elements.
-            _node = self._choose_feature(_data, _label)
-            if _node.split is None:
-                continue
-
-            # Copy the attributes of _node to node.
-            node.copy(_node)
-
-            # Put children of current node in que.
-            idx_left = (_data[:, node.feature] < node.split)
-            idx_right = (_data[:, node.feature] >= node.split)
-            que.append(
-                (depth + 1, node.left, _data[idx_left], _label[idx_left]))
-            que.append(
-                (depth + 1, node.right, _data[idx_right], _label[idx_right]))
-
-        # Update tree depth and rules.
-        self.depth = depth
-        self.get_rules()
-
-    def predict_one(self, row: ndarray) -> float:
-        # Auxiliary function of predict.
-
-        node = self.root
-        while node.left and node.right:
-            if row[node.feature] < node.split:
-                node = node.left
+    # Method to calculate pointer moves
+    def calculate_moves(self):
+        for i in range(self.data_length):
+            if self.y_lower[i] == self.y_upper[i]:
+                if float('-inf') < self.y_lower[i]:
+                    coefficients_1 = self.calculate_coefficients(self.y_lower[i], 0., -1, self.loss_type)
+                    coefficients_2 = self.calculate_coefficients(self.y_upper[i], 0., 1, self.loss_type)
+                    self.moves_list[i] += self.insert_break_point(self.y_lower[i], coefficients_1, -1) + \
+                                          self.insert_break_point(self.y_upper[i], coefficients_2, 1)
             else:
-                node = node.right
+                if float('-inf') < self.y_lower[i]:
+                    coefficient = self.calculate_coefficients(self.y_lower[i], 1, -1, self.loss_type)
+                    self.moves_list[i] += self.insert_break_point(self.y_lower[i] + 1, coefficient, -1)
+                if self.y_upper[i] < float('inf'):
+                    coefficient = self.calculate_coefficients(self.y_upper[i], 1, 1, self.loss_type)
+                    self.moves_list[i] += self.insert_break_point(self.y_upper[i] - 1, coefficient, 1)
+        return
 
-        return node.avg
+    @staticmethod
+    def calculate_coefficients(y, margin, s, loss_type):
+        if loss_type == 1:  # Linear
+            return 0, s, margin - s * y
+        else:  # Square
+            return 1, 2 * margin * s - 2 * y, -2 * margin * s * y + y * y + margin * margin
 
-    def predict(self, data: ndarray) -> ndarray:
+    # Method to calculate moves for each pointer
+    def insert_break_point(self, point, coefficients, s):
+        pointer_moves = 0
+        _coefficients = (coefficients[0] * s, coefficients[1] * s, coefficients[2] * s)
+        if len(self.breakpoint_list) == 0:
+            self.breakpoint_list.append([point, _coefficients])
+            if s == 1:
+                self.min_pointer = point
+                pointer_moves += 1
+        else:
+            added_flag = False
+            for i in range(len(self.breakpoint_list)):
+                if self.breakpoint_list[i][0] == point:
+                    added_flag = True
+                    # If point is exist, renew the coefficients
+                    self.breakpoint_list[i][1] = (
+                        coefficients[0] + _coefficients[0], coefficients[1] + _coefficients[1],
+                        coefficients[2] + _coefficients[2])
+                    break
+            if not added_flag:
+                # If point is not exist, insert the point and coefficients
+                self.breakpoint_list.append([point, _coefficients])
+                self.breakpoint_list.sort()
 
-        return np.apply_along_axis(self.predict_one, 1, data)
+            # Get min pointer and coefficient
+            min_breakpoint_position = self.get_breakpoint_position(self.min_pointer)
+            if self.position_check(point, s, min_breakpoint_position):
+                self.min_coefficients = (
+                    self.min_coefficients[0] + coefficients[0], self.min_coefficients[1] + coefficients[1],
+                    self.min_coefficients[2] + coefficients[2])
+
+            # Move the min pointer to the left
+            if self.check_increase_or_decrease(self.min_coefficients, min_breakpoint_position, 1):
+                while self.min_pointer != self.breakpoint_list[0][0] and \
+                        not self.check_increase_or_decrease(self.min_coefficients, min_breakpoint_position, 0) and \
+                        not self.check_min_interval(self.min_coefficients,
+                                                self.get_breakpoint_position(self.get_previous_point(self.min_pointer)),
+                                                self.min_pointer):
+                    self.min_pointer = self.get_previous_point(self.min_pointer)
+                    min_breakpoint_position = self.get_breakpoint_position(self.min_pointer)
+                    self.min_coefficients = self.coefficient_subtraction(self.min_coefficients, self.min_pointer)
+                    pointer_moves += 1
+
+            # Move the min pointer to the right
+            elif self.check_increase_or_decrease(self.min_coefficients, min_breakpoint_position, 0):
+                while self.min_pointer != self.breakpoint_list[len(self.breakpoint_list) - 1][0] and \
+                        (not self.check_increase_or_decrease(
+                            self.coefficient_addition(self.min_coefficients, self.min_pointer),
+                            self.get_breakpoint_position(self.get_next_point(self.min_pointer)), 1) or
+                         self.check_min_interval(self.coefficient_addition(self.min_coefficients, self.min_pointer),
+                                                 self.get_breakpoint_position(self.min_pointer),
+                                                 self.get_breakpoint_position(self.get_next_point(self.min_pointer)))):
+                    self.min_coefficients = self.coefficient_addition(self.min_coefficients, self.min_pointer)
+                    self.min_pointer = self.get_next_point(self.min_pointer)
+                    min_breakpoint_position = self.get_breakpoint_position(self.min_pointer)
+                    pointer_moves += 1
+        return pointer_moves
+
+    def get_breakpoint_position(self, point):
+        if point == self.breakpoint_list[len(self.breakpoint_list) - 1][0]:
+            return float('inf')
+        else:
+            return point
+
+    @staticmethod
+    def position_check(break_point, s, break_position):
+        if s == 1 and break_position > break_point:
+            return True
+        elif s == -1 and break_position <= break_point:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    # Check the position is increase or decrease
+    def check_increase_or_decrease(coefficients, value, mode):
+        gradient = coefficients[0] * 2 * value + coefficients[1]
+        if mode == 0:
+            if gradient < 0:
+                return True
+        else:
+            if gradient > 0:
+                return True
+        return False
+
+    @staticmethod
+    def check_min_interval(coefficients, value_1, value_2):
+        if coefficients[0] == 0 and coefficients[1] == 0:
+            return True
+        else:
+            if coefficients[0] != 0:
+                min_value = -coefficients[1] / (2 * coefficients[0])
+            elif coefficients[1] != 0:
+                min_value = float('-inf') * coefficients[1]
+            else:
+                min_value = 0
+            return value_1 < min_value < value_2 or value_2 == min_value
+
+    # Get the previous point of a point in the list
+    def get_previous_point(self, point):
+        for i in range(len(self.breakpoint_list)):
+            if self.breakpoint_list[i][0] == point and i > 0:
+                return self.breakpoint_list[i - 1][0]
+        else:
+            return self.breakpoint_list[0][0]
+
+    # Get the next point of a point in the list
+    def get_next_point(self, point):
+        for i in range(len(self.breakpoint_list)):
+            if self.breakpoint_list[i][0] == point and i < len(self.breakpoint_list) - 1:
+                return self.breakpoint_list[i + 1][0]
+        else:
+            return self.breakpoint_list[len(self.breakpoint_list) - 1][0]
+
+    def coefficient_addition(self, coefficient, point):
+        for breakpoint_element in self.breakpoint_list:
+            if breakpoint_element[0] == point:
+                return (
+                    coefficient[0] + breakpoint_element[1][0],
+                    coefficient[1] + breakpoint_element[1][1],
+                    coefficient[2] + breakpoint_element[1][2]
+                )
+        return coefficient
+
+    def coefficient_subtraction(self, coefficient, point):
+        for breakpoint_element in self.breakpoint_list:
+            if breakpoint_element[0] == point:
+                return (
+                    coefficient[0] - breakpoint_element[1][0],
+                    coefficient[1] - breakpoint_element[1][1],
+                    coefficient[2] - breakpoint_element[1][2]
+                )
+        return coefficient
+
+    @staticmethod
+    def calcualte_quantile(data, p):
+        data.sort()
+        pos = (len(data) + 1) * p
+        pos_integer = int(math.modf(pos)[1])
+        pos_decimal = pos - pos_integer
+        return data[pos_integer - 1] + (data[pos_integer] - data[pos_integer - 1]) * pos_decimal
 
 
-def main():
-    # Load data
-    data, label = load_data()
-    # Split data randomly, train set rate 70%
-    data_train, data_test, label_train, label_test = train_test_split(data, label, random_state=200)
-    # Train model
-    reg = RegressionTree()
-    reg.fit(data=data_train, label=label_train, max_depth=5)
-    # Show rules
-    print(reg)
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    Project = Project2()
+    Project.run()
