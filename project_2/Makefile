@@ -1,2 +1,2 @@
-test_set_result.csv: main.py datasets/auto93/features.csv
+result.csv: main.py features.csv
 	python main.py
