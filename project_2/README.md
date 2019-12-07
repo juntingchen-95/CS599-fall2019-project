@@ -24,6 +24,6 @@ Libraries: numpy (Python), pandas (Python), ggplot2 (R)
 
 1. Download the project folder
 
-2. In the command line, change the directory into the project folder, input command "python main.py". Then, it will generate the file "result.csv"
+2. In the command line, change the directory into the project folder, input command "python mmit.py". Then, it will generate the file "result.csv"
 
 3. In RStudio, open the file "generate_figure.R", select all and run the code, then it will generate the figure file "result_figure_1.pdf" and "result_figure_2.pdf". 
