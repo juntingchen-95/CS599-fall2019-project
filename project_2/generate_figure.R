@@ -16,7 +16,7 @@ plot_1 <- ggplot() +
   ylab('Average moves') 
 
 # Save the plot as PDF format
-ggsave(filename = paste(dir, 'result_figure_1.pdf', sep='/'), plot_1 = plot, width = 10, height = 8)
+ggsave(filename = paste(dir, 'result_figure_1.pdf', sep='/'), plot = plot_1, width = 10, height = 8)
 
 plot_2 <- ggplot() + 
   scale_x_log10() + 
