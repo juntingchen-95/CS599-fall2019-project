@@ -1,2 +1,2 @@
-result.csv: main.py targets.csv
-	python main.py
+result.csv: mmit.py targets.csv
+	python mmit.py
