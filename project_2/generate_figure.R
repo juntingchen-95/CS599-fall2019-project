@@ -13,7 +13,7 @@ plot_1 <- ggplot() +
   # Plot lines
   geom_line(data = result_data, mapping = aes(x = number, y = max, color = loss_type), size = 1.5, lineend = "round") + 
   xlab('Number of Output') + 
-  ylab('Average moves') 
+  ylab('Max moves') 
 
 # Save the plot as PDF format
 ggsave(filename = paste(dir, 'result_figure_1.pdf', sep='/'), plot = plot_1, width = 10, height = 8)
