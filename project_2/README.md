@@ -16,7 +16,7 @@ Drouin, et al. Maximum Margin Interval Trees, Figure 3 Left
 
 ### Necessary Softwares and Libraries
 
-Softwares: Python(3.x), R, Rstudio
+Softwares: Python(3.x), R, RStudio
 
 Libraries: numpy (Python), pandas (Python), ggplot2 (R)
 
